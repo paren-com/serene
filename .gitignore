@@ -1,0 +1,14 @@
+*.class
+*.jar
+/.lein-*
+/.nrepl-history
+/.nrepl-port
+/checkouts
+/classes
+/node_modules
+/package-lock.json
+/pom.xml
+/pom.xml.asc
+/scratch.*
+/target
+/yarn.lock
