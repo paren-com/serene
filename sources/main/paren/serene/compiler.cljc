@@ -149,14 +149,7 @@
                        ((fn type->spec [{:keys [non-null? kind type name]}]
                           (let [spec (case kind
                                        :list-type `(s/coll-of ~(type->spec type) :kind sequential?)
-                                       :named-type (let [named-type-node (type-name->node name)]
-                                                     (if (= (:kind named-type-node) :interface-type-definition)
-                                                       (->> named-type-node
-                                                         :name
-                                                         interface-name->object-names
-                                                         (mapcat (juxt identity type-name->spec-name))
-                                                         (cons `s/or))
-                                                       (type-name->spec-name name))))]
+                                       :named-type (type-name->spec-name name))]
                             (if non-null?
                               spec
                               `(s/nilable ~spec)))))))
@@ -222,6 +215,14 @@
                                                    [k (type-name->spec-name k)]))
                                          (cons `s/or))
                                        node))
+            :interface-type-definition (add-spec!
+                                         (-> node :spec :name)
+                                         (->> node
+                                           :name
+                                           interface-name->object-names
+                                           (mapcat (fn [k]
+                                                     [k (type-name->spec-name k)]))
+                                           (cons `s/or)))
             :input-value-definition (add-spec! (-> node :spec :name) (and-directives (-> node :type type->spec) node))
             :field-definition (let [spec (if (= (:name node) :__typename)
                                            (-> node :spec :name namespace (str/split #"\.") last hash-set)
@@ -229,7 +230,6 @@
                                 (add-spec! (-> node :spec :name) (and-directives spec node))
                                 (add-spec! (-> node :arguments-spec :name) (-> node :arguments (nodes->keys-spec {:input? true}))))
             (:input-object-type-definition
-             :interface-type-definition
              :object-type-definition) (let [input? (= (:kind node) :input-object-type-definition)
                                             spec (nodes->keys-spec (:fields node) {:input? input?})]
                                         (add-spec! (-> node :spec :name) (and-directives spec node)))

@@ -177,7 +177,8 @@
                                                          {:seed true}]}))
     (t/testing "union, union-returning fields, and interface-returning fields"
       (test-specs
-        [:gql/Union_ID
+        [:gql/Interface_ID
+         :gql/Union_ID
          :gql.Query/interfaceID
          :gql.Query/unionID]
         {:valid [{:id "ID"
