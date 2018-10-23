@@ -52,7 +52,10 @@
   (comp
     (test-env)
     (bat-test)
-    (test-cljs :ids ["paren/serene_test"])))
+    #_ ; Disable due to https://dev.clojure.org/jira/browse/CLJS-2940
+    (test-cljs
+      :cljs-opts {:parallel-build true}
+      :ids ["paren/serene_test"])))
 
 (deftask dev-env []
   (merge-env! :resource-paths #{"sources/dev"
