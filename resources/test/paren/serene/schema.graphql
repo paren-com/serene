@@ -1,0 +1,62 @@
+directive @serene(spec: String!) on
+ARGUMENT_DEFINITION
+| ENUM
+| ENUM_VALUE
+| FIELD_DEFINITION
+| INPUT_FIELD_DEFINITION
+| INPUT_OBJECT
+| INTERFACE
+| OBJECT
+| SCALAR
+| UNION
+
+scalar Scalar_Any
+scalar Scalar_Email @serene(spec: ":paren.serene-test/email")
+
+interface Interface_ID {
+  id: ID!
+}
+
+interface Interface_EmailOrUsername @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+  email: Scalar_Email
+  username: String
+}
+
+type Object_EmailOrUsername implements Interface_EmailOrUsername Interface_ID @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+  id: ID!
+  email: Scalar_Email
+  username: String
+}
+
+input InputObject_EmailOrUsername @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+  email: Scalar_Email
+  username: String
+}
+
+type Object_IffHasChildThenChild implements Interface_ID @serene(spec: ":paren.serene-test/iff-has-child-then-child") {
+  id: ID!
+  hasChild: Boolean!
+  child: Object_IffHasChildThenChild
+}
+
+union Union_ID = Object_EmailOrUsername | Object_IffHasChildThenChild
+
+type Query {
+  randPosInt(noDefault: Int!, seed: Int! = 42): Int! @serene(spec: "pos-int?")
+  interfaceID: Interface_ID!
+  unionID: Union_ID!
+}
+
+type Mutation {
+  createUser(user: InputObject_EmailOrUsername!): ID!
+}
+
+type Subscription {
+  newUsers: [ID!]!
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
