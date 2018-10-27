@@ -56,7 +56,8 @@
     (bat-test)
     (test-cljs
       :cljs-opts {:parallel-build true}
-      :ids ["paren/serene_test"])))
+      :ids ["paren/serene_test"]
+      :js-env :node)))
 
 (deftask dev-env []
   (merge-env! :resource-paths #{"sources/dev"
