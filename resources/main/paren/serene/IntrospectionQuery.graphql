@@ -1,0 +1,97 @@
+query IntrospectionQuery {
+  __schema {
+    __typename
+    queryType { name }
+    mutationType { name }
+    subscriptionType { name }
+    directives { ...Directive }
+    types { ...Type }
+  }
+}
+
+fragment Directive on __Directive {
+  __typename
+  args { ...InputValue }
+  description
+  locations
+  name
+}
+
+fragment EnumValue on __EnumValue {
+  __typename
+  deprecationReason
+  description
+  isDeprecated
+  name
+}
+
+fragment Field on __Field {
+  __typename
+  args { ...InputValue }
+  deprecationReason
+  description
+  isDeprecated
+  name
+  type { ...TypeRef }
+}
+
+fragment InputValue on __InputValue {
+  __typename
+  defaultValue
+  description
+  name
+  type { ...TypeRef }
+}
+
+fragment Type on __Type {
+  __typename
+  description
+  enumValues(includeDeprecated: true) { ...EnumValue } # ENUM
+  fields(includeDeprecated: true) { ...Field } # INTERFACE & OBJECT
+  inputFields { ...InputValue } # INPUT_OBJECT
+  interfaces { ...TypeRef } # OBJECT
+  kind
+  name
+  possibleTypes { ...TypeRef } # INTERFACE & UNION
+}
+
+fragment TypeRef on __Type {
+  __typename
+  kind
+  name
+  ofType {
+    __typename
+    kind
+    name
+    ofType {
+      __typename
+      kind
+      name
+      ofType {
+        __typename
+        kind
+        name
+        ofType {
+          __typename
+          kind
+          name
+          ofType {
+            __typename
+            kind
+            name
+            ofType {
+              __typename
+              kind
+              name
+              ofType {
+                __typename
+                kind
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

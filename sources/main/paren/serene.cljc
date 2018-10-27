@@ -4,72 +4,73 @@
    [clojure.string :as str]
    [clojure.walk :as walk]
    [paren.serene.compiler :as compiler]
-   [paren.serene.parser :as parser]
+   [paren.serene.introspection :as introspection]
    #?(:clj [clojure.java.io :as io]))
   #?(:cljs (:require-macros
             [paren.serene])))
 
-#?(:clj (s/fdef schema
-          :args (s/cat
-                  :parse-method #(contains? (methods parser/parse) %)
-                  :schema-source some?
-                  :options (s/keys
-                             :opt-un [::compiler/alias
-                                      ::compiler/namespace]))))
+#?(:clj (def introspection-query
+          (-> "paren/serene/IntrospectionQuery.graphql" io/resource slurp)))
 
-#?(:clj (defn schema
-          ([parse-method schema-source]
-           (schema parse-method schema-source {}))
-          ([parse-method schema-source options]
-           (let [schema-source (if (string? schema-source)
-                                 (or
-                                   (some-> schema-source io/resource slurp)
-                                   (let [file (io/file schema-source)]
-                                     (when (.isFile file)
-                                       (slurp file)))
-                                   schema-source)
-                                 schema-source)
-                 config (merge
-                          {:alias (constantly #{})
-                           :namespace *ns*}
-                          options)
-                 parsed-schema (parser/parse parse-method schema-source config)
-                 compiled-schema (compiler/compile parsed-schema config)]
-             compiled-schema))))
+(defn schema
+  ([introspection-response]
+   (schema introspection-response {}))
+  ([introspection-response options]
+   {:pre [(map? introspection-response)
+          (map? options)]}
+   (let [resp (->> introspection-response
+                walk/keywordize-keys
+                (walk/postwalk (fn [x]
+                                 (cond
+                                   (map? x) (->> x
+                                              (map (fn [[k v]]
+                                                     [k
+                                                      (case k
+                                                        (:__typename :kind :name) (keyword v)
+                                                        :locations (mapv keyword v)
+                                                        v)]))
+                                              (into (sorted-map)))
+                                   (seq? x) (vec x)
+                                   :else x))))
+         cfg (merge
+               {:alias (constantly #{})
+                :prefix *ns*
+                :specs {}}
+               options)
+         compiled (compiler/compile resp cfg)]
+     compiled)))
 
-#?(:clj (defn ^:private eval-all [form]
-          (walk/prewalk
-            (fn [form]
-              (cond
-                (fn? form) form
-                (seq? form) (-> form eval eval-all)
-                :else (eval form)))
-            form)))
+(defmacro defschema
+  [name introspection-response & {:as options}]
+  (let [resp (eval introspection-response)
+        opts (eval options)
+        compiled-schema (schema resp opts)
+        ret (if (:def-specs? opts)
+              `(let [ret# ~compiled-schema]
+                 (def-specs ret#)
+                 ret#)
+              compiled-schema)]
+    `(def ~name ~ret)))
 
-#?(:clj (defmacro defschema
-          [name parse-method schema-source & {:as options}]
-          (let [schema-source (eval-all schema-source)
-                options (if (:alias options)
-                          (update options :alias eval-all)
-                          options)
-                compiled-schema (schema parse-method schema-source options)
-                ret (if (:def-specs? options)
-                      `(let [ret# ~compiled-schema]
-                         (def-specs ret#)
-                         ret#)
-                      compiled-schema)]
-            `(def ~name ~ret))))
+(s/def ::def-specs fn?)
+
+(s/def ::undef-specs fn?)
+
+(s/def ::evaluated-schema (s/keys
+                            :req-un [::def-specs
+                                     ::undef-specs
+                                     ::introspection/response]))
 
 (defn undef-specs
-  [compiled-schema]
-  (s/assert ::compiler/compiled-and-evaluated-schema compiled-schema)
-  ((-> compiled-schema ::compiler/spec-fns :undef)))
+  [evaluated-schema]
+  {:pre [(s/valid? ::evaluated-schema evaluated-schema)]}
+  ((:undef-specs evaluated-schema)))
 
 (defn def-specs
-  [compiled-schema]
-  (s/assert ::compiler/compiled-and-evaluated-schema compiled-schema)
+  [evaluated-schema]
+  {:pre [(s/valid? ::evaluated-schema evaluated-schema)]}
   (try
-    ((-> compiled-schema ::compiler/spec-fns :def))
+    ((:def-specs evaluated-schema))
     (catch #?(:clj Throwable :cljs :default) e
-      (undef-specs compiled-schema)
+      (undef-specs evaluated-schema)
       (throw e))))

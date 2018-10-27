@@ -1,5 +1,6 @@
 (ns paren.serene.dev
   (:require
+   [clojure.data.json :as json]
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
@@ -12,12 +13,10 @@
    [com.walmartlabs.lacinia.schema :as lacinia.schema]
    [com.walmartlabs.lacinia.util :as lacinia.util]
    [expound.alpha :refer [expound]]
+   [org.httpkit.client :as http]
    [paren.serene :as serene]
    [paren.serene.compiler :as compiler]
-   [paren.serene.parser :as parser]
-   [paren.serene.parser.lacinia]
-   [paren.serene.parser.sdl]
-   [paren.serene.schema :as schema]))
+   [paren.serene.introspection :as introspection]))
 
 (defn ^:private pprint-spit
   [f form]
@@ -27,13 +26,3 @@
       pprint
       with-out-str
       (spit f))))
-
-#_
-(pprint-spit "target/tmp.clj"
-  (macroexpand-1
-    '(serene/defschema schema :sdl "resources/test/paren/serene/schema.graphql"
-       :alias (fn [kw]
-                (keyword
-                  (namespace kw)
-                  (str (name kw) "-alias")))
-       :namespace :gql)))

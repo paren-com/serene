@@ -1,39 +1,28 @@
-directive @serene(spec: String!) on
-ARGUMENT_DEFINITION
-| ENUM
-| ENUM_VALUE
-| FIELD_DEFINITION
-| INPUT_FIELD_DEFINITION
-| INPUT_OBJECT
-| INTERFACE
-| OBJECT
-| SCALAR
-| UNION
-
 scalar Scalar_Any
-scalar Scalar_Email @serene(spec: ":paren.serene-test/email")
+
+scalar Scalar_Email
 
 interface Interface_ID {
   id: ID!
 }
 
-interface Interface_EmailOrUsername @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+interface Interface_EmailOrUsername {
   email: Scalar_Email
-  username: String
+  username(downcase: Boolean! = false): String
 }
 
-type Object_EmailOrUsername implements Interface_EmailOrUsername Interface_ID @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+type Object_EmailOrUsername implements Interface_EmailOrUsername Interface_ID {
   id: ID!
   email: Scalar_Email
-  username: String
+  username(downcase: Boolean! = false): String
 }
 
-input InputObject_EmailOrUsername @serene(spec: ":paren.serene-test/map-of-email-or-username") {
+input InputObject_EmailOrUsername {
   email: Scalar_Email
-  username: String
+  username(downcase: Boolean! = false): String
 }
 
-type Object_IffHasChildThenChild implements Interface_ID @serene(spec: ":paren.serene-test/iff-has-child-then-child") {
+type Object_IffHasChildThenChild implements Interface_ID {
   id: ID!
   hasChild: Boolean!
   child: Object_IffHasChildThenChild
@@ -41,8 +30,16 @@ type Object_IffHasChildThenChild implements Interface_ID @serene(spec: ":paren.s
 
 union Union_ID = Object_EmailOrUsername | Object_IffHasChildThenChild
 
+enum Enum_DefaultScalar {
+  Boolean
+  Float
+  ID
+  Int
+  String
+}
+
 type Query {
-  randPosInt(noDefault: Int!, seed: Int! = 42): Int! @serene(spec: "pos-int?")
+  randPosInt(noDefault: Int!, seed: Int! = 42): Int!
   interfaceID: Interface_ID!
   unionID: Union_ID!
 }

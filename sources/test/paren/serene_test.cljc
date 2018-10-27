@@ -5,14 +5,31 @@
    [clojure.string :as str]
    [clojure.test :as t]
    [clojure.test.check]
+   [clojure.walk :as walk]
    [paren.serene :as serene]
-   [paren.serene.parser.lacinia]
-   [paren.serene.parser.sdl]
-   #?(:cljs [doo.runner :include-macros true]))
+   #?@(:clj [[clojure.java.io :as io]
+             [com.walmartlabs.lacinia :as lacinia]
+             [com.walmartlabs.lacinia.parser.schema :as lacinia.parser.schema]
+             [com.walmartlabs.lacinia.schema :as lacinia.schema]]
+       :cljs [[doo.runner :include-macros true]]))
   #?(:cljs (:require-macros
             [paren.serene-test :refer [test-spec test-specs]])))
 
 (s/check-asserts true)
+
+#?(:clj (defn ^:private get-introspection-query-response []
+          (let [sdl (-> "paren/serene/schema.graphql" io/resource slurp)
+                edn (lacinia.parser.schema/parse-schema sdl {})
+                edn (update edn :scalars (fn [scalars]
+                                           (->> scalars
+                                             (map (fn [[k v]]
+                                                    [k (assoc v
+                                                         :parse (s/conformer any?)
+                                                         :serialize (s/conformer any?))]))
+                                             (into {}))))
+                schema (lacinia.schema/compile edn)
+                resp (lacinia/execute schema serene/introspection-query {} {})]
+            resp)))
 
 (defn ^:private email? [x]
   (and
@@ -52,12 +69,22 @@
 
 (defn ^:private alias-spec [kw]
   (keyword
-    (namespace kw)
-    (str (name kw) "-alias")))
+    (let [ns (namespace kw)]
+      (cond
+        (nil? ns) "alias.gql"
+        (str/starts-with? ns "gql") (str "alias." ns)
+        :else (str "alias.gql." ns)))
+    (name kw)))
 
-(serene/defschema schema :sdl "paren/serene/schema.graphql"
+(serene/defschema schema (get-introspection-query-response)
   :alias alias-spec
-  :namespace :gql)
+  :prefix :gql
+  :specs {:InputObject_EmailOrUsername ::map-of-email-or-username
+          :Interface_EmailOrUsername   ::map-of-email-or-username
+          :Object_EmailOrUsername      ::map-of-email-or-username
+          :Object_IffHasChildThenChild ::iff-has-child-then-child
+          :Query/randPosInt            `pos-int?
+          :Scalar_Email                ::email})
 
 (t/use-fixtures :once
   (fn [run-tests]
@@ -82,53 +109,47 @@
          `(test-spec ~spec ~examples))))
 
 (t/deftest defschema-test
-  (t/testing "specs are defined"
-    (doseq [spec [;; default types
+  (t/testing "specs and aliases are defined"
+    (doseq [spec [;; scalars
                   :gql/Boolean
                   :gql/Float
                   :gql/ID
                   :gql/Int
                   :gql/String
-                  :gql/__Type
-                  :gql/__Schema
-                  :gql/__Field
-                  :gql/__InputValue
-                  :gql/__EnumValue
-                  :gql/__Directive
-                  :gql/__TypeKind
-                  :gql/__DirectiveLocation
-                  ;; default fields
-                  :gql.Query/__typename
-                  :gql.Query/__type
-                  :gql.Query/__schema
-                  ;; default args
-                  :gql.Query.__type/__args
-                  :gql.Query.__type/name
-                  ;; types
+                  :gql/Scalar_Email
+                  ;; enums
+                  :gql/Enum_DefaultScalar
+                  ;; enum values
+                  :gql.Enum_DefaultScalar/Boolean
+                  ;; input objects
+                  :gql/InputObject_EmailOrUsername
+                  ;; input object fields
+                  :gql.InputObject_EmailOrUsername/email
+                  ;; interfaces
+                  :gql/Interface_EmailOrUsername
+                  ;; interface fields
+                  :gql.Interface_EmailOrUsername/email
+                  ;; interface field args
+                  :gql.Interface_EmailOrUsername.username/%
+                  :gql.Interface_EmailOrUsername.username/downcase
+                  ;; objects
                   :gql/Query
                   :gql/Mutation
                   :gql/Subscription
-                  :gql/InputObject_EmailOrUsername
-                  :gql/Interface_EmailOrUsername
-                  :gql/Interface_ID
                   :gql/Object_EmailOrUsername
-                  :gql/Object_IffHasChildThenChild
-                  :gql/Scalar_Any
-                  :gql/Scalar_Email
-                  :gql/Union_ID
-                  ;; fields
-                  :gql.InputObject_EmailOrUsername/email
-                  :gql.Interface_EmailOrUsername/email
+                  ;; object fields
+                  :gql.Query/__typename
+                  :gql.Object_EmailOrUsername/__typename
                   :gql.Object_EmailOrUsername/email
-                  ;; args
-                  :gql.Query.randPosInt/__args
-                  :gql.Query.randPosInt/seed
-                  ;; aliases
-                  :gql/Query-alias
-                  :gql.Query/__type-alias
-                  :gql.Query.__type/__args-alias
-                  :gql.Query.__type/name-alias]]
-      (t/is (s/get-spec spec))))
+                  ;; object field args
+                  :gql.Object_EmailOrUsername.username/%
+                  :gql.Object_EmailOrUsername.username/downcase
+                  ;; unions
+                  :gql/Union_ID]
+            :let [alias (alias-spec spec)]]
+      (t/is (s/get-spec spec))
+      (t/is (s/get-spec alias))
+      (t/is (= (s/form spec) (s/form alias)))))
   (t/testing "specs"
     (t/testing "scalars"
       (test-specs [:gql/ID :gql/String] {:valid ["str"]
@@ -154,7 +175,9 @@
       (test-spec :gql.Query/randPosInt {:valid [1 42]
                                         :invalid [nil 0 -42]})
       (test-spec :gql.Query.randPosInt/seed {:valid [1 0 -1]
-                                          :invalid [nil "str"]}))
+                                             :invalid [nil "str"]})
+      (test-spec :gql.Query/__typename {:valid ["Query"]
+                                        :invalid ["str" 1]}))
     (t/testing "objects, interfaces, input objects, and args"
       (test-specs
         [:gql/InputObject_EmailOrUsername
@@ -170,7 +193,7 @@
                     :username "user"}
                    {:id "ID"
                     :email true}]})
-      (test-spec :gql.Query.randPosInt/__args {:valid [{:noDefault 1
+      (test-spec :gql.Query.randPosInt/% {:valid [{:noDefault 1
                                                         :seed 1}]
                                                :invalid [{}
                                                          {:seed nil}
@@ -195,14 +218,9 @@
        :gql.Object_EmailOrUsername/email]
       {:valid ["foo@bar"]
        :invalid ["foobar"]}))
-  (t/testing "aliases"
-    (t/is (= (s/form :gql/Query) (s/form :gql/Query-alias)))
-    (t/is (= (s/form :gql.Query/__type) (s/form :gql.Query/__type-alias)))
-    (t/is (= (s/form :gql.Query.__type/__args) (s/form :gql.Query.__type/__args-alias)))
-    (t/is (= (s/form :gql.Query.__type/name) (s/form :gql.Query.__type/name-alias))))
   (t/testing "undef"
     (serene/undef-specs schema)
-    (t/is (not (s/get-spec :gql/Query)))))
+    #(:clj (t/is (not (s/get-spec :gql/Query))))))
 
 #?(:cljs (doo.runner/doo-tests))
 
