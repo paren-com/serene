@@ -1,7 +1,17 @@
 (ns paren.serene.introspection
   (:require
    [clojure.spec.alpha :as s]
-   [clojure.walk :as walk]))
+   [clojure.walk :as walk]
+   #?(:clj [clojure.java.io :as io]))
+  #?(:cljs (:require-macros
+            [paren.serene.introspection :refer [slurp-query]])))
+
+#?(:clj (defmacro ^:private slurp-query []
+          (-> "paren/serene/IntrospectionQuery.graphql"
+            io/resource
+            slurp)))
+
+(def query (slurp-query))
 
 (s/def ::Directive (s/keys
                      :req-un [::__typename
