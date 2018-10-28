@@ -1,6 +1,7 @@
 (ns paren.serene.introspection
   (:require
-   [clojure.spec.alpha :as s]))
+   [clojure.spec.alpha :as s]
+   [clojure.walk :as walk]))
 
 (s/def ::Directive (s/keys
                      :req-un [::__typename
@@ -136,6 +137,30 @@
 
 (s/def ::errors (s/nilable empty?))
 
-(s/def ::response (s/keys
-                    :req-un [::data]
-                    :opt-un [::errors]))
+(defn ^:private normalize-response
+  "* keywordizes all keys and some specific values
+  * replaces non-serializable collections with serializable collections
+  * converts sets and sequential collections into sorted vectors "
+  [response]
+  (->> response
+    walk/keywordize-keys
+    (walk/postwalk (fn [x]
+                     (cond
+                       (map? x) (->> x
+                                  (map (fn [[k v]]
+                                         [k
+                                          (case k
+                                            (:__typename :kind :name) (keyword v)
+                                            :locations (mapv keyword v)
+                                            v)]))
+                                  (into (sorted-map)))
+                       (or
+                         (set? x)
+                         (sequential? x)) (->> x (sort-by :name) vec)
+                       :else x)))))
+
+(s/def ::response (s/and
+                    (s/conformer normalize-response)
+                    (s/keys
+                      :req-un [::data]
+                      :opt-un [::errors])))

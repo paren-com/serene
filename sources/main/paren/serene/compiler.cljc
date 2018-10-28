@@ -4,16 +4,10 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [clojure.walk :as walk]
-   [paren.serene.introspection :as introspection])
+   [paren.serene.introspection :as introspection]
+   #?(:cljs [cljs.reader :refer [read-string]]))
   #?(:cljs (:require-macros
             [paren.serene.compiler])))
-
-(defn ^:private namespace?
-  [x]
-  (instance?
-    #?(:clj clojure.lang.Namespace
-       :cljs cljs.core.Namespace)
-    x))
 
 (def ^:private tmp-ns
   "paren.serene.compiler.tmp")
@@ -53,9 +47,7 @@
 (defn ^:private prefix-spec-name
   [prefix k]
   {:pre [(tmp-spec-name? k)]}
-  (let [prefix (name (if (namespace? prefix)
-                       (ns-name prefix)
-                       prefix))
+  (let [prefix (name prefix)
         segs (str/split (name k) #"\.")
         ns (->> (butlast segs)
              (cons prefix)
@@ -247,7 +239,7 @@
               v)]))
     (into {})))
 
-(defn ^:private and-specs [raw-specs tmp-spec-map]
+(defn ^:private extend-specs [extensions tmp-spec-map]
   (reduce
     (fn [spec-map [k v]]
       (let [tmp-k (tmp-spec-name k)]
@@ -256,28 +248,22 @@
         (update spec-map tmp-k (fn [spec]
                                  `(s/and ~spec ~v)))))
     tmp-spec-map
-    raw-specs))
+    extensions))
 
 (defn ^:private alias-specs [alias-fn tmp-spec-map]
-  (let [alias-fn (fn alias-wrapper [kw]
-                   (let [ret (alias-fn kw)]
-                     (cond
-                       (nil? ret) #{}
-                       (keyword? ret) #{ret}
-                       (set? ret) ret)))]
-    (reduce
-      (fn [spec-map tmp-k]
-        (let [raw-k (raw-spec-name tmp-k)
-              aliases (alias-fn raw-k)]
-          (reduce
-            (fn [spec-map alias]
-              (when (contains? spec-map alias)
-                (throw (ex-info (str "Alias not unique: " alias) {:alias alias})))
-              (assoc spec-map alias tmp-k))
-            spec-map
-            aliases)))
-      tmp-spec-map
-      (keys tmp-spec-map))))
+  (reduce
+    (fn [spec-map tmp-k]
+      (let [raw-k (raw-spec-name tmp-k)
+            aliases (alias-fn raw-k)]
+        (reduce
+          (fn [spec-map alias]
+            (when (contains? spec-map alias)
+              (throw (ex-info (str "Alias not unique: " alias) {:alias alias})))
+            (assoc spec-map alias tmp-k))
+          spec-map
+          aliases)))
+    tmp-spec-map
+    (keys tmp-spec-map)))
 
 (defn ^:private prefix-specs [prefix tmp-spec-map]
   (->> tmp-spec-map
@@ -310,53 +296,88 @@
       (apply dissoc prefix-spec-map (keys aliases))
       (sort-aliases [] aliases))))
 
-(s/def ::alias (s/fspec
-                 :args (s/cat :keyword qualified-keyword?)
-                 :ret (s/nilable
-                        (s/or
-                          :keyword qualified-keyword?
-                          :set (s/coll-of qualified-keyword? :kind set?)))
-                 :fn (fn [{:keys [args ret]}]
-                       (case (first ret)
-                         :keyword (not= (second ret) (:keyword args))
-                         :set (not (contains? (second ret) (:keyword args)))
-                         nil true))))
+(defn ^:private def-specs [specs]
+  (map
+    (fn [[k v]]
+      `(s/def ~k ~v))
+    specs))
 
-(s/def ::prefix (s/or
-                  :namespace namespace?
-                  :ident simple-ident?))
+(s/def ::alias (s/and
+                 (s/fspec
+                   :args (s/cat :keyword qualified-keyword?)
+                   :ret (s/nilable
+                          (s/or
+                            :keyword qualified-keyword?
+                            :set (s/coll-of qualified-keyword? :kind set?)))
+                   :fn (fn [{:keys [args ret]}]
+                         (case (first ret)
+                           :keyword (not= (second ret) (:keyword args))
+                           :set (not (contains? (second ret) (:keyword args)))
+                           nil true)))
+                 (s/conformer
+                   (fn [alias-fn]
+                     (fn alias-wrapper [kw]
+                       (let [ret (alias-fn kw)]
+                         (cond
+                           (nil? ret) #{}
+                           (keyword? ret) #{ret}
+                           (set? ret) ret)))))))
 
-(s/def ::specs (s/map-of keyword? (s/or
-                                    :keyword qualified-keyword?
-                                    :symbol symbol?
-                                    :seq seq?)))
+(s/def ::extensions (s/map-of
+                      keyword? (s/and
+                                 (s/nonconforming
+                                   (s/or
+                                     :keyword qualified-keyword?
+                                     :symbol symbol?
+                                     :seq seq?))
+                                 (fn serializable? [form]
+                                   (try
+                                     (= (-> form pr-str read-string) form)
+                                     (catch #?(:clj Throwable :cljs :default) e
+                                       false))))))
 
-(s/def ::config (s/keys
-                  :req-un [::alias ::prefix ::specs]))
+(s/def ::prefix (s/and
+                  (s/or
+                    :namespace (fn namespace? [x]
+                                 (instance?
+                                   #?(:clj clojure.lang.Namespace
+                                      :cljs cljs.core.Namespace)
+                                   x))
+                    :ident simple-ident?)
+                  (s/conformer
+                    (fn [[k v]]
+                      (case k
+                        :namespace (ns-name v)
+                        :ident v)))))
+
+(defn ^:private conform!
+  [spec x]
+  (let [conformed (s/conform spec x)]
+    (if (s/invalid? conformed)
+      (throw (ex-info
+               (str "Invalid " spec ": " (s/explain-str spec x))
+               {:spec spec
+                :invalid x}))
+      conformed)))
 
 (defn compile
-  [introspection-response {:as config
-                           :keys [alias prefix specs]}]
-  {:pre [(s/valid? ::introspection/response introspection-response)
-         (s/valid? ::config config)]}
-  (let [compiled-specs (->> introspection-response
-                         assoc-specs
-                         collect-specs
-                         nonconform-specs
-                         (and-specs specs)
-                         (alias-specs alias)
-                         (prefix-specs prefix)
-                         topo-sort-specs)]
-    `(let [undef-specs# (fn undef-specs# []
-                          ~(mapv
-                             (fn [[k v]]
-                               `(s/def ~k nil))
-                             compiled-specs))
-           def-specs# (fn def-specs# []
-                        ~(mapv
-                           (fn [[k v]]
-                             `(s/def ~k ~v))
-                           compiled-specs))]
-       {:def-specs def-specs#
-        :undef-specs undef-specs#
-        :response ~introspection-response})))
+  "Takes a GraphQL introspection query response.
+  Returns a topologically sorted vector of `s/def` forms."
+  ([response]
+   (compile response {}))
+  ([response {:keys [alias
+                     extensions
+                     prefix]
+              :or {alias (constantly #{})
+                   extensions {}
+                   prefix *ns*}}]
+   (->> (conform! ::introspection/response response)
+     assoc-specs
+     collect-specs
+     nonconform-specs
+     (extend-specs (conform! ::extensions extensions))
+     (alias-specs (conform! ::alias alias))
+     (prefix-specs (conform! ::prefix prefix))
+     topo-sort-specs
+     def-specs
+     vec)))

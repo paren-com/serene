@@ -76,25 +76,16 @@
         :else (str "alias.gql." ns)))
     (name kw)))
 
-(serene/defschema schema (get-introspection-query-response)
-  :alias alias-spec
-  :prefix :gql
-  :specs {:InputObject_EmailOrUsername ::map-of-email-or-username
-          :Interface_EmailOrUsername   ::map-of-email-or-username
-          :Object_EmailOrUsername      ::map-of-email-or-username
-          :Object_IffHasChildThenChild ::iff-has-child-then-child
-          :Query/randPosInt            `pos-int?
-          :Scalar_Email                ::email})
-
-(t/use-fixtures :once
-  (fn [run-tests]
-    (try
-      (serene/def-specs schema)
-      (st/instrument)
-      (run-tests)
-      (finally
-        (st/unstrument)
-        (serene/undef-specs schema)))))
+(def ^:private defined-specs
+  (serene/def-specs (get-introspection-query-response)
+    :alias alias-spec
+    :extensions {:InputObject_EmailOrUsername ::map-of-email-or-username
+                 :Interface_EmailOrUsername   ::map-of-email-or-username
+                 :Object_EmailOrUsername      ::map-of-email-or-username
+                 :Object_IffHasChildThenChild ::iff-has-child-then-child
+                 :Query/randPosInt            `pos-int?
+                 :Scalar_Email                ::email}
+    :prefix :gql))
 
 (defmacro ^:private test-spec [spec {:keys [valid invalid]}]
   `(do
@@ -217,10 +208,7 @@
        :gql.Interface_EmailOrUsername/email
        :gql.Object_EmailOrUsername/email]
       {:valid ["foo@bar"]
-       :invalid ["foobar"]}))
-  (t/testing "undef"
-    (serene/undef-specs schema)
-    #(:clj (t/is (not (s/get-spec :gql/Query))))))
+       :invalid ["foobar"]})))
 
 #?(:cljs (doo.runner/doo-tests))
 
