@@ -7,7 +7,8 @@
    [clojure.test.check]
    [clojure.walk :as walk]
    [paren.serene :as serene]
-   #?@(:clj [[clojure.java.io :as io]
+   #?@(:clj [[clojure.data.json :as json]
+             [clojure.java.io :as io]
              [com.walmartlabs.lacinia :as lacinia]
              [com.walmartlabs.lacinia.parser.schema :as lacinia.parser.schema]
              [com.walmartlabs.lacinia.schema :as lacinia.schema]]
@@ -79,12 +80,12 @@
 (def ^:private defined-specs
   (serene/def-specs (get-introspection-query-response)
     :alias alias-spec
-    :extensions {:InputObject_EmailOrUsername ::map-of-email-or-username
-                 :Interface_EmailOrUsername   ::map-of-email-or-username
-                 :Object_EmailOrUsername      ::map-of-email-or-username
-                 :Object_IffHasChildThenChild ::iff-has-child-then-child
-                 :Query/randPosInt            `pos-int?
-                 :Scalar_Email                ::email}
+    :extend {:InputObject_EmailOrUsername ::map-of-email-or-username
+             :Interface_EmailOrUsername   ::map-of-email-or-username
+             :Object_EmailOrUsername      ::map-of-email-or-username
+             :Object_IffHasChildThenChild ::iff-has-child-then-child
+             :Query/randPosInt            `pos-int?
+             :Scalar_Email                ::email}
     :prefix :gql))
 
 (defmacro ^:private test-spec [spec {:keys [valid invalid]}]

@@ -150,7 +150,7 @@
       (assoc ::spec {::name (tmp-spec-name obj)
                      ::form (if (= (:name obj) :__typename)
                               #{(-> obj ::parent :name name)}
-                                (-> obj :type type-ref-spec))})
+                              (-> obj :type type-ref-spec))})
       (assoc ::args-spec {::name (tmp-spec-name {::parent obj :name :%})
                           ::form (-> obj :args input-values-spec)}))))
 
@@ -215,7 +215,8 @@
                               (cons `s/or)
                               doall)}))
 
-(defn ^:private collect-specs [resp]
+(defn ^:private collect-specs
+  [resp]
   (->> resp
     (tree-seq coll? seq)
     (filter map?)
@@ -230,7 +231,8 @@
         (assoc m k v))
       {})))
 
-(defn ^:private nonconform-specs [tmp-spec-map]
+(defn ^:private nonconform-specs
+  [tmp-spec-map]
   (->> tmp-spec-map
     (map (fn [[k v]]
            [k
@@ -239,18 +241,19 @@
               v)]))
     (into {})))
 
-(defn ^:private extend-specs [extensions tmp-spec-map]
+(defn ^:private extend-specs
+  [extend-fn tmp-spec-map]
   (reduce
-    (fn [spec-map [k v]]
-      (let [tmp-k (tmp-spec-name k)]
-        (when-not (contains? tmp-spec-map tmp-k)
-          (throw (ex-info (str "Invalid spec name: " k) {:spec k})))
+    (fn [spec-map tmp-k]
+      (if-some [ext (-> tmp-k raw-spec-name extend-fn)]
         (update spec-map tmp-k (fn [spec]
-                                 `(s/and ~spec ~v)))))
+                                 `(s/and ~spec ~ext)))
+        spec-map))
     tmp-spec-map
-    extensions))
+    (keys tmp-spec-map)))
 
-(defn ^:private alias-specs [alias-fn tmp-spec-map]
+(defn ^:private alias-specs
+  [alias-fn tmp-spec-map]
   (reduce
     (fn [spec-map tmp-k]
       (let [raw-k (raw-spec-name tmp-k)
@@ -265,7 +268,8 @@
     tmp-spec-map
     (keys tmp-spec-map)))
 
-(defn ^:private prefix-specs [prefix tmp-spec-map]
+(defn ^:private prefix-specs
+  [prefix tmp-spec-map]
   (->> tmp-spec-map
     (map (fn [[k v]]
            [k (walk/postwalk (partial maybe-prefix-spec-name prefix) v)]))
@@ -278,7 +282,8 @@
           (assoc m k v)))
       {})))
 
-(defn ^:private topo-sort-specs [prefix-spec-map]
+(defn ^:private topo-sort-specs
+  [prefix-spec-map]
   (let [sort-aliases (fn sort-aliases [sorted unsorted]
                        (let [no-deps (->> unsorted
                                        (remove (fn [[k v]]
@@ -296,45 +301,62 @@
       (apply dissoc prefix-spec-map (keys aliases))
       (sort-aliases [] aliases))))
 
-(defn ^:private def-specs [specs]
+(defn ^:private def-specs
+  [spec-entries]
   (map
     (fn [[k v]]
       `(s/def ~k ~v))
-    specs))
+    spec-entries))
+
+(defn ^:private conform!
+  [spec x]
+  (let [conformed (s/conform spec x)]
+    (if (s/invalid? conformed)
+      (throw (ex-info
+               (str "Invalid " spec ": " (s/explain-str spec x))
+               {:spec spec
+                :invalid x}))
+      conformed)))
+
+(s/def ::aliases (s/and
+                   (s/or
+                     :coll (s/nilable
+                             (s/coll-of qualified-keyword?
+                               :distinct true))
+                     :keyword qualified-keyword?)
+                   (s/conformer
+                     (fn [[k v]]
+                       (case k
+                         :coll (set v)
+                         :keyword #{v})))))
 
 (s/def ::alias (s/and
-                 (s/fspec
-                   :args (s/cat :keyword qualified-keyword?)
-                   :ret (s/nilable
-                          (s/or
-                            :keyword qualified-keyword?
-                            :set (s/coll-of qualified-keyword? :kind set?)))
-                   :fn (fn [{:keys [args ret]}]
-                         (case (first ret)
-                           :keyword (not= (second ret) (:keyword args))
-                           :set (not (contains? (second ret) (:keyword args)))
-                           nil true)))
+                 ifn?
                  (s/conformer
                    (fn [alias-fn]
                      (fn alias-wrapper [kw]
-                       (let [ret (alias-fn kw)]
-                         (cond
-                           (nil? ret) #{}
-                           (keyword? ret) #{ret}
-                           (set? ret) ret)))))))
+                       (conform! ::aliases (alias-fn kw)))))))
 
-(s/def ::extensions (s/map-of
-                      keyword? (s/and
-                                 (s/nonconforming
-                                   (s/or
-                                     :keyword qualified-keyword?
-                                     :symbol symbol?
-                                     :seq seq?))
-                                 (fn serializable? [form]
-                                   (try
-                                     (= (-> form pr-str read-string) form)
-                                     (catch #?(:clj Throwable :cljs :default) e
-                                       false))))))
+(defn ^:private serializable?
+  [form]
+  (try
+    (= (-> form pr-str read-string) form)
+    (catch #?(:clj Throwable :cljs :default) e
+      false)))
+
+(s/def ::extension (s/nilable
+                     (s/nonconforming
+                       (s/or
+                         :keyword qualified-keyword?
+                         :seq (s/and seq? serializable?)
+                         :symbol symbol?))))
+
+(s/def ::extend (s/and
+                  ifn?
+                  (s/conformer
+                    (fn [extend-fn]
+                      (fn extend-wrapper [kw]
+                        (conform! ::extension (extend-fn kw)))))))
 
 (s/def ::prefix (s/and
                   (s/or
@@ -350,32 +372,22 @@
                         :namespace (ns-name v)
                         :ident v)))))
 
-(defn ^:private conform!
-  [spec x]
-  (let [conformed (s/conform spec x)]
-    (if (s/invalid? conformed)
-      (throw (ex-info
-               (str "Invalid " spec ": " (s/explain-str spec x))
-               {:spec spec
-                :invalid x}))
-      conformed)))
-
 (defn compile
   "Takes a GraphQL introspection query response.
   Returns a topologically sorted vector of `s/def` forms."
   ([response]
    (compile response {}))
   ([response {:keys [alias
-                     extensions
+                     extend
                      prefix]
               :or {alias (constantly #{})
-                   extensions {}
+                   extend (constantly nil)
                    prefix *ns*}}]
    (->> (conform! ::introspection/response response)
      assoc-specs
      collect-specs
      nonconform-specs
-     (extend-specs (conform! ::extensions extensions))
+     (extend-specs (conform! ::extend extend))
      (alias-specs (conform! ::alias alias))
      (prefix-specs (conform! ::prefix prefix))
      topo-sort-specs
