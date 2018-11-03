@@ -1,6 +1,6 @@
 (task-options!
   pom {:project 'com.paren/serene
-       :version "0.0.1-SNAPSHOT"
+       :version "0.0.1-RC1"
        :description "Generate clojure.spec with GraphQL and extend GraphQL with clojure.spec"
        :url "https://github.com/paren-com/serene"
        :scm {:url "https://github.com/paren-com/serene"}

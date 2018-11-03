@@ -15,7 +15,6 @@
    [expound.alpha :refer [expound]]
    [org.httpkit.client :as http]
    [paren.serene :as serene]
-   [paren.serene.compiler :as compiler]
    [paren.serene.introspection :as introspection]))
 
 (defn ^:private pprint-spit

@@ -79,14 +79,15 @@
 
 (def ^:private defined-specs
   (serene/def-specs (get-introspection-query-response)
-    :alias alias-spec
-    :extend {:InputObject_EmailOrUsername ::map-of-email-or-username
-             :Interface_EmailOrUsername   ::map-of-email-or-username
-             :Object_EmailOrUsername      ::map-of-email-or-username
-             :Object_IffHasChildThenChild ::iff-has-child-then-child
-             :Query/randPosInt            `pos-int?
-             :Scalar_Email                ::email}
-    :prefix :gql))
+    (comp
+      (serene/prefix :gql)
+      (serene/extend {:gql.Query/randPosInt            `pos-int?
+                      :gql/InputObject_EmailOrUsername ::map-of-email-or-username
+                      :gql/Interface_EmailOrUsername   ::map-of-email-or-username
+                      :gql/Object_EmailOrUsername      ::map-of-email-or-username
+                      :gql/Object_IffHasChildThenChild ::iff-has-child-then-child
+                      :gql/Scalar_Email                ::email})
+      (serene/alias alias-spec))))
 
 (defmacro ^:private test-spec [spec {:keys [valid invalid]}]
   `(do
@@ -122,7 +123,8 @@
                   ;; interface fields
                   :gql.Interface_EmailOrUsername/email
                   ;; interface field args
-                  :gql.Interface_EmailOrUsername.username/%
+                  :gql.Interface_EmailOrUsername/username'args
+
                   :gql.Interface_EmailOrUsername.username/downcase
                   ;; objects
                   :gql/Query
@@ -134,7 +136,7 @@
                   :gql.Object_EmailOrUsername/__typename
                   :gql.Object_EmailOrUsername/email
                   ;; object field args
-                  :gql.Object_EmailOrUsername.username/%
+                  :gql.Object_EmailOrUsername/username'args
                   :gql.Object_EmailOrUsername.username/downcase
                   ;; unions
                   :gql/Union_ID]
@@ -185,11 +187,11 @@
                     :username "user"}
                    {:id "ID"
                     :email true}]})
-      (test-spec :gql.Query.randPosInt/% {:valid [{:noDefault 1
-                                                        :seed 1}]
-                                               :invalid [{}
-                                                         {:seed nil}
-                                                         {:seed true}]}))
+      (test-spec :gql.Query/randPosInt'args {:valid [{:noDefault 1
+                                                      :seed 1}]
+                                             :invalid [{}
+                                                       {:seed nil}
+                                                       {:seed true}]}))
     (t/testing "union, union-returning fields, and interface-returning fields"
       (test-specs
         [:gql/Interface_ID
@@ -212,4 +214,3 @@
        :invalid ["foobar"]})))
 
 #?(:cljs (doo.runner/doo-tests))
-
