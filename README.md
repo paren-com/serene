@@ -22,9 +22,6 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
             - [`prefix`](#prefix)
             - [`postfix-args`](#postfix-args)
     - [Spec Names](#spec-names)
-        - [1st level](#1st-level)
-        - [2nd level](#2nd-level)
-        - [3rd level](#3rd-level)
     - [How It Works](#how-it-works)
     - [Status](#status)
     - [License](#license)
@@ -129,27 +126,34 @@ For example, if you want arguments specs to end with `-args`, you would do this:
 
 Spec names are keywords that are namespaced by their position in the schema. For the examples below, let's assume a prefix of `:gql` instead of `*ns*`.
 
-### 1st level
+```graphql
+# Built-in scalars :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, and :gql/String are defined
 
-Type definitions (enum, input object, interface, object, scalar, and union) are defined at this level.
+scalar Email # :gql/Email
 
-Examples: `:gql/String`, `:gql/User`, `:gql/Mutation`, `:gql/CreateUserInput`
+enum Mood { # :gql/Mood
+  SERENE # :gql.Mood/SERENE
+  ANNOYED # :gql.Mood/ANNOYED
+  ANGRY # :gql.Mood/ANGRY
+}
 
-### 2nd level
+type User { # :gql/User
+  id: ID! # :gql.User/id
+  username: String! # :gql.User/username
+  email: Email! # :gql.User/email
+  mood: Mood # :gql.User/mood
+}
 
-Enum values, interface fields, input object fields, and object fields are defined at this level.
-
-Examples: `:gql.User/email`, `:gql.Mutation/createUser`, `:gql.Status/COMPLETE`
-
-Additionally, special anonymous `s/keys` specs for field arguments are defined at this level.
-
-Example: `:gql.Mutation/createUser%`
-
-### 3rd level
-
-Input values (argument fields) are defined at this level.
-
-Examples: `:gql.Mutation.createUser/email`, `:gql.Mutation.createUser/firstName`
+type Mutation { # :gql/Mutation
+  createUser(
+    # Special anonymous `s/keys` specs for field arguments
+    # :gql.Mutation/createUser%
+    username: String!, # :gql.Mutation.createUser/username
+    email: Email! # :gql.Mutation.createUser/email
+    mood: Mood # :gql.Mutation.createUser/mood
+  ): User! # :gql.Mutation/createUser
+}
+```
 
 ## How It Works
 
