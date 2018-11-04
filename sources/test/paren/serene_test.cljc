@@ -80,7 +80,8 @@
 (def ^:private defined-specs
   (serene/def-specs (get-introspection-query-response)
     (comp
-      (serene/prefix :gql)
+      (serene/prefix (constantly :gql))
+      (serene/postfix-args (constantly :-args))
       (serene/extend {:gql.Query/randPosInt            `pos-int?
                       :gql/InputObject_EmailOrUsername ::map-of-email-or-username
                       :gql/Interface_EmailOrUsername   ::map-of-email-or-username
@@ -123,7 +124,7 @@
                   ;; interface fields
                   :gql.Interface_EmailOrUsername/email
                   ;; interface field args
-                  :gql.Interface_EmailOrUsername/username'args
+                  :gql.Interface_EmailOrUsername/username-args
 
                   :gql.Interface_EmailOrUsername.username/downcase
                   ;; objects
@@ -136,7 +137,7 @@
                   :gql.Object_EmailOrUsername/__typename
                   :gql.Object_EmailOrUsername/email
                   ;; object field args
-                  :gql.Object_EmailOrUsername/username'args
+                  :gql.Object_EmailOrUsername/username-args
                   :gql.Object_EmailOrUsername.username/downcase
                   ;; unions
                   :gql/Union_ID]
@@ -187,7 +188,7 @@
                     :username "user"}
                    {:id "ID"
                     :email true}]})
-      (test-spec :gql.Query/randPosInt'args {:valid [{:noDefault 1
+      (test-spec :gql.Query/randPosInt-args {:valid [{:noDefault 1
                                                       :seed 1}]
                                              :invalid [{}
                                                        {:seed nil}

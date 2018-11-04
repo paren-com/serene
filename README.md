@@ -92,14 +92,27 @@ For example, if you have a custom `Keyword` scalar you could use the following t
 ```
 
 #### `prefix`
-`paren.serene/prefix` is a function which receives a keyword or symbol and returns a transducer that will rename all specs prefixed with `*ns*`. For example, instead of having a long namespace prefix, you might want to prefix your specs with `:gql`:
+`paren.serene/prefix` is a function which receives a function (or map) of spec names to spec prefixes and returns a transducer that will rename all specs prefixed with `*ns*`.
+For example, instead of having a long namespace prefix, you might want to prefix your specs with `:gql`:
 
 ```clojure
 (serene/def-specs (execute-query serene/introspection-query)
-  (serene/prefix :gql))
+  (serene/prefix (constantly :gql)))
   ```
 
 This will produce specs like `:gql/Query`, `:gql.Query/node`, etc.
+
+#### `postfix-args`
+`paren.serene/postfix-args` is a function which receives a function (or map) of field args spec names to postfixes and returns a transducer that will rename all specs postfixed with `%`.
+For background, GraphQL field arguments are individually but not named as a whole.
+As such, we define a `s/keys` spec for every field named `(str field-name "%")`.
+`postfix-args` is used to rename `%` to a postfix of your choice.
+For example, if you want arguments specs to end with `-args`, you would do this:
+
+```clojure
+(serene/def-specs (execute-query serene/introspection-query)
+  (serene/postfix-args (constantly :-args)))
+  ```
 
 ## Spec Names
 
@@ -119,7 +132,7 @@ Examples: `:gql.User/email`, `:gql.Mutation/createUser`, `:gql.Status/COMPLETE`
 
 Additionally, special anonymous `s/keys` specs for field arguments are defined at this level.
 
-Example: `:gql.Mutation/createUser'args`
+Example: `:gql.Mutation/createUser%`
 
 ### 3rd level
 

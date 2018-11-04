@@ -148,7 +148,7 @@
                               (-> obj :type type-ref-spec))})
       (assoc ::args-spec {::name (spec-name (update obj :name #(-> %
                                                                  name
-                                                                 (str "'args")
+                                                                 (str "%")
                                                                  keyword)))
                           ::form (-> obj :args input-values-spec)}))))
 
@@ -320,22 +320,45 @@
            entry))))
 
 (defn prefix
-  "Takes a simple keyword or symbol.
-  Returns a transducer that replaces keywords prefixed with `*ns*` with keywords prefixed with `prefix`."
-  [prefix]
-  {:pre [(simple-ident? prefix)]}
-  (let [prefix (name prefix)
-        ns (-> *ns* ns-name name)]
+  "Takes a function (or map) that will receive a spec name prefixed with `*ns*` and should return a new prefx or `nil`.
+  Returns a transducer that replaces keywords prefixed with `*ns*`."
+  [prefix-fn]
+  {:pre [(ifn? prefix-fn)]}
+  (let [ns (-> *ns* ns-name name)]
     (comp
       (map (partial
              walk/postwalk
              (fn [x]
-               (if (and
-                     (keyword? x)
-                     (namespace x)
-                     (str/starts-with? (namespace x) ns))
-                 (keyword
-                   (str/replace-first (namespace x) ns prefix)
-                   (name x))
+               (if-let [prefix (and
+                                 (keyword? x)
+                                 (namespace x)
+                                 (str/starts-with? (namespace x) ns)
+                                 (prefix-fn x))]
+                 (do
+                   (conform! simple-ident? prefix)
+                   (keyword
+                     (str/replace-first (namespace x) ns (name prefix))
+                     (name x)))
                  x))))
       (map map-entry))))
+
+(defn postfix-args
+  "Takes a function (or map) that will receive a spec name postfixed with `%` and should return a new postfix or `nil`.
+  Returns a transducer that replaces keywords postfixed with `%`."
+  [postfix-args-fn]
+  {:pre [(ifn? postfix-args-fn)]}
+  (comp
+    (map (partial
+           walk/postwalk
+           (fn [x]
+             (if-let [postfix (and
+                                (keyword? x)
+                                (str/ends-with? (name x) "%")
+                                (postfix-args-fn x))]
+               (do
+                 (conform! simple-ident? postfix)
+                 (keyword
+                   (namespace x)
+                   (str/replace-first (name x) #"%$" (name postfix))))
+               x))))
+    (map map-entry)))
