@@ -16,12 +16,12 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
     - [QuickStart](#quickstart)
     - [Rationale](#rationale)
     - [Usage](#usage)
+        - [Generated Spec Names](#generated-spec-names)
         - [`def-specs`](#def-specs)
             - [`alias`](#alias)
             - [`extend`](#extend)
             - [`prefix`](#prefix)
             - [`postfix-args`](#postfix-args)
-    - [Spec Names](#spec-names)
     - [How It Works](#how-it-works)
     - [Status](#status)
     - [License](#license)
@@ -66,6 +66,39 @@ Some languages, like OCaml/Reason, can even [validate queries and response code 
 If other languages can leverage GraphQL to this extent, Clojure should be able to as well. Serene aims to address this.
 
 ## Usage
+
+### Generated Spec Names
+
+Spec names are keywords that are namespaced by their position in the schema. For the examples below, let's assume a prefix of `:gql` instead of `*ns*`.
+
+```graphql
+# Built-in scalars :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, and :gql/String are defined
+
+scalar Email # :gql/Email
+
+enum Mood { # :gql/Mood
+  SERENE # :gql.Mood/SERENE
+  ANNOYED # :gql.Mood/ANNOYED
+  ANGRY # :gql.Mood/ANGRY
+}
+
+type User { # :gql/User
+  id: ID! # :gql.User/id
+  username: String! # :gql.User/username
+  email: Email! # :gql.User/email
+  mood: Mood # :gql.User/mood
+}
+
+type Mutation { # :gql/Mutation
+  createUser(
+    # Special anonymous `s/keys` specs for field arguments
+    # :gql.Mutation/createUser%
+    username: String!, # :gql.Mutation.createUser/username
+    email: Email! # :gql.Mutation.createUser/email
+    mood: Mood # :gql.Mutation.createUser/mood
+  ): User! # :gql.Mutation/createUser
+}
+```
 
 ### `def-specs`
 
@@ -121,39 +154,6 @@ For example, if you want arguments specs to end with `-args`, you would do this:
 (serene/def-specs (execute-query serene/introspection-query)
   (serene/postfix-args (constantly :-args)))
   ```
-
-## Spec Names
-
-Spec names are keywords that are namespaced by their position in the schema. For the examples below, let's assume a prefix of `:gql` instead of `*ns*`.
-
-```graphql
-# Built-in scalars :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, and :gql/String are defined
-
-scalar Email # :gql/Email
-
-enum Mood { # :gql/Mood
-  SERENE # :gql.Mood/SERENE
-  ANNOYED # :gql.Mood/ANNOYED
-  ANGRY # :gql.Mood/ANGRY
-}
-
-type User { # :gql/User
-  id: ID! # :gql.User/id
-  username: String! # :gql.User/username
-  email: Email! # :gql.User/email
-  mood: Mood # :gql.User/mood
-}
-
-type Mutation { # :gql/Mutation
-  createUser(
-    # Special anonymous `s/keys` specs for field arguments
-    # :gql.Mutation/createUser%
-    username: String!, # :gql.Mutation.createUser/username
-    email: Email! # :gql.Mutation.createUser/email
-    mood: Mood # :gql.Mutation.createUser/mood
-  ): User! # :gql.Mutation/createUser
-}
-```
 
 ## How It Works
 
