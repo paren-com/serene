@@ -63,16 +63,18 @@ GraphQL's type system provides a point of leverage for API providers and consume
 Because GraphQL schemas are introspectable, [GraphQL tooling](https://github.com/chentsulin/awesome-graphql#tools) tends to be very powerful.
 Some languages, like OCaml/Reason, can even [validate queries and response code at compile time](https://github.com/mhallin/graphql_ppx).
 
-If other languages can leverage GraphQL to this extent, Clojure should be able to as well. Serene aims to address this.
+If other languages can leverage GraphQL to this extent, Clojure should be able to as well.
+Serene aims to address this.
 
 ## Usage
 
 ### Generated Spec Names
 
-Spec names are keywords that are namespaced by their position in the schema. For the examples below, let's assume a prefix of `:gql` instead of `*ns*`.
+Spec names are keywords that are prefixed and namespaced by their position in the schema.
+For the example below, let's assume a prefix of `:gql`, though the prefix is customizable.
 
 ```graphql
-# Built-in scalars :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, and :gql/String are defined
+# Built-in scalars are defined: :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, :gql/String
 
 scalar Email # :gql/Email
 
@@ -91,11 +93,10 @@ type User { # :gql/User
 
 type Mutation { # :gql/Mutation
   createUser(
-    # Special anonymous `s/keys` specs for field arguments
-    # :gql.Mutation/createUser%
     username: String!, # :gql.Mutation.createUser/username
     email: Email! # :gql.Mutation.createUser/email
     mood: Mood # :gql.Mutation.createUser/mood
+    # :gql.Mutation/createUser% is an anonymous `s/keys` spec for args map
   ): User! # :gql.Mutation/createUser
 }
 ```
@@ -145,8 +146,8 @@ This will produce specs like `:gql/Query`, `:gql.Query/node`, etc.
 
 #### `postfix-args`
 `paren.serene/postfix-args` is a function which receives a function (or map) of field args spec names to postfixes and returns a transducer that will rename all specs postfixed with `%`.
-For background, GraphQL field arguments are individually but not named as a whole.
-As such, we define a `s/keys` spec for every field named `(str field-name "%")`.
+For background, GraphQL field arguments are individually named but not named as a whole.
+As such, we define an arguments map spec for every field named `(str field-name "%")`.
 `postfix-args` is used to rename `%` to a postfix of your choice.
 For example, if you want arguments specs to end with `-args`, you would do this:
 
