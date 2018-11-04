@@ -13,32 +13,31 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
 **Table of Contents**
 
 - [Serene](#serene)
+    - [QuickStart](#quickstart)
+    - [Rationale](#rationale)
     - [Usage](#usage)
-        - [QuickStart](#quickstart)
         - [`def-specs`](#def-specs)
             - [`alias`](#alias)
             - [`extend`](#extend)
             - [`prefix`](#prefix)
+            - [`postfix-args`](#postfix-args)
     - [Spec Names](#spec-names)
         - [1st level](#1st-level)
         - [2nd level](#2nd-level)
         - [3rd level](#3rd-level)
-    - [Rationale](#rationale)
     - [How It Works](#how-it-works)
     - [Status](#status)
     - [License](#license)
 
 <!-- markdown-toc end -->
 
-## Usage
-
-### QuickStart
+## QuickStart
 
 The heart of Serene, and perhaps the *only* function that you will need to use, is `paren.serene/def-specs`.
 `def-specs` works with any GraphQL API.
 Just query the API with the query defined at `paren.serene/introspection-query` and pass the response to `def-specs`.
 The compilation happens during macro expansion and all arguments to `def-specs` are explicitly `eval`ed.
-You can define specs for your entire GraphQL API in one line of code.
+Serene can generate specs for your entire GraphQL API in one line of code.
 
 Let's say you have a project called "Serenity":
 
@@ -58,6 +57,18 @@ Let's say you have a project called "Serenity":
 
 (s/valid? ::User {:firstName "Frank" :lastName "Costanza"}) ;=> true
 ```
+
+## Rationale
+
+It is our experience that GraphQL is superior to REST for most APIs used for web and mobile applications. We also think that clojure.spec provides a good balance of expressiveness and strictness.
+
+GraphQL's type system provides a point of leverage for API providers and consumers.
+Because GraphQL schemas are introspectable, [GraphQL tooling](https://github.com/chentsulin/awesome-graphql#tools) tends to be very powerful.
+Some languages, like OCaml/Reason, can even [validate queries and response code at compile time](https://github.com/mhallin/graphql_ppx).
+
+If other languages can leverage GraphQL to this extent, Clojure should be able to as well. Serene aims to address this.
+
+## Usage
 
 ### `def-specs`
 
@@ -140,16 +151,6 @@ Input values (argument fields) are defined at this level.
 
 Examples: `:gql.Mutation.createUser/email`, `:gql.Mutation.createUser/firstName`
 
-## Rationale
-
-It is our experience that GraphQL is superior to REST for most APIs used for web and mobile applications. We also think that clojure.spec provides a good balance of expressiveness and strictness.
-
-GraphQL's type system provides a point of leverage for API providers and consumers.
-Because GraphQL schemas are introspectable, [GraphQL tooling](https://github.com/chentsulin/awesome-graphql#tools) tends to be very powerful.
-Some languages, like OCaml/Reason, can even [validate queries and response code at compile time](https://github.com/mhallin/graphql_ppx).
-
-If statically typed languages can leverage GraphQL to this extent, Clojure should be able to do even more. Serene aims to address this.
-
 ## How It Works
 
 Serene works in much the same way as [GraphiQL](https://github.com/graphql/graphiql) and other GraphQL tools; it uses GraphQL's introspection capabilities.
@@ -163,7 +164,7 @@ If clojure.spec is alpha, then Serene is extra alpha.
 
 Consider everything to be an implementation detail unless it is explicitly documented here.
 
-Serene uses [@ptaoussanis](https://github.com/ptaoussanis)' [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md).
+Serene uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md).
 
 ## License
 
