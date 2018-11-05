@@ -22,7 +22,7 @@
                   [expound "0.7.1" :scope "test"]
                   [http-kit "2.3.0" :scope "test"]
                   [metosin/bat-test "0.4.0" :scope "test"]
-                  [org.clojure/clojurescript "1.10.339"]
+                  [org.clojure/clojurescript "1.10.439"]
                   [org.clojure/data.json "0.2.6" :scope "test"]
                   [org.clojure/spec.alpha "0.2.176"]
                   [org.clojure/test.check "0.10.0-alpha3" :scope "test"]

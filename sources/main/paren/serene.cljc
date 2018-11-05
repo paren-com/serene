@@ -104,10 +104,7 @@
                        :kind sequential?)
                     (spec-name obj))]
          (if-not non-null?
-           (nonconforming
-             `(s/or ; Avoid using `s/nilable` due to https://dev.clojure.org/jira/browse/CLJS-2940
-                :null nil?
-                :non-null ~spec))
+           `(s/nilable ~spec)
            spec))))))
 
 (defn ^:private input-values-spec
