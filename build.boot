@@ -20,10 +20,11 @@
                   [crisptrutski/boot-cljs-test "0.3.5-SNAPSHOT" :scope "test"]
                   [doo "0.1.8" :scope "test"]
                   [expound "0.7.1" :scope "test"]
-                  [http-kit "2.3.0" :scope "test"]
+                  [fipp "0.6.14"]
+                  [http-kit "2.3.0"]
                   [metosin/bat-test "0.4.0" :scope "test"]
                   [org.clojure/clojurescript "1.10.439"]
-                  [org.clojure/data.json "0.2.6" :scope "test"]
+                  [org.clojure/data.json "0.2.6"]
                   [org.clojure/spec.alpha "0.2.176"]
                   [org.clojure/test.check "0.10.0-alpha3" :scope "test"]
                   [samestep/boot-refresh "0.1.0" :scope "test"]])
