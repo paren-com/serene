@@ -13,15 +13,20 @@
    [com.walmartlabs.lacinia.schema :as lacinia.schema]
    [com.walmartlabs.lacinia.util :as lacinia.util]
    [expound.alpha :refer [expound]]
+   [fipp.clojure :as fipp]
    [org.httpkit.client :as http]
    [paren.serene :as serene]
-   [paren.serene.introspection :as introspection]))
+   [paren.serene.compiler :as compiler]
+   [paren.serene.schema :as schema]))
 
 (defn ^:private pprint-spit
   [f form]
   (io/make-parents f)
-  (binding [*print-length* nil]
-    (->> form
-      pprint
-      with-out-str
-      (spit f))))
+  (with-open [w (io/writer f)]
+    (binding [*out* w]
+      (fipp/pprint
+        form
+        {:print-length nil
+         :print-level nil
+         :print-meta true
+         :width 100}))))

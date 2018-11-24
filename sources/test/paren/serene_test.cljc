@@ -7,6 +7,7 @@
    [clojure.test.check]
    [clojure.walk :as walk]
    [paren.serene :as serene]
+   [paren.serene.schema :as schema]
    #?@(:clj [[clojure.data.json :as json]
              [clojure.java.io :as io]
              [com.walmartlabs.lacinia :as lacinia]
@@ -29,7 +30,7 @@
                                                          :serialize (s/conformer any?))]))
                                              (into {}))))
                 schema (lacinia.schema/compile edn)
-                resp (lacinia/execute schema serene/introspection-query {} {})]
+                resp (lacinia/execute schema schema/query {} {})]
             resp)))
 
 (defn ^:private email? [x]
@@ -68,27 +69,15 @@
 
 (s/def ::iff-has-child-then-child iff-has-child-then-child?)
 
-(defn ^:private alias-spec [kw]
-  (keyword
-    (let [ns (namespace kw)]
-      (cond
-        (nil? ns) "alias.gql"
-        (str/starts-with? ns "gql") (str "alias." ns)
-        :else (str "alias.gql." ns)))
-    (name kw)))
-
 (def ^:private defined-specs
   (serene/def-specs (get-introspection-query-response)
-    (comp
-      (serene/prefix (constantly :gql))
-      (serene/postfix-args (constantly :-args))
-      (serene/extend {:gql.Query/randPosInt            `pos-int?
-                      :gql/InputObject_EmailOrUsername ::map-of-email-or-username
-                      :gql/Interface_EmailOrUsername   ::map-of-email-or-username
-                      :gql/Object_EmailOrUsername      ::map-of-email-or-username
-                      :gql/Object_IffHasChildThenChild ::iff-has-child-then-child
-                      :gql/Scalar_Email                ::email})
-      (serene/alias alias-spec))))
+    {:prefix :gql
+     :extend {:Query/randPosInt            `pos-int?
+              :InputObject_EmailOrUsername ::map-of-email-or-username
+              :Interface_EmailOrUsername   ::map-of-email-or-username
+              :Object_EmailOrUsername      ::map-of-email-or-username
+              :Object_IffHasChildThenChild ::iff-has-child-then-child
+              :Scalar_Email                ::email}}))
 
 (defmacro ^:private test-spec [spec {:keys [valid invalid]}]
   `(do
@@ -124,7 +113,7 @@
                   ;; interface fields
                   :gql.Interface_EmailOrUsername/email
                   ;; interface field args
-                  :gql.Interface_EmailOrUsername/username-args
+                  :gql.Interface_EmailOrUsername/username%
 
                   :gql.Interface_EmailOrUsername.username/downcase
                   ;; objects
@@ -137,14 +126,11 @@
                   :gql.Object_EmailOrUsername/__typename
                   :gql.Object_EmailOrUsername/email
                   ;; object field args
-                  :gql.Object_EmailOrUsername/username-args
+                  :gql.Object_EmailOrUsername/username%
                   :gql.Object_EmailOrUsername.username/downcase
                   ;; unions
-                  :gql/Union_ID]
-            :let [alias (alias-spec spec)]]
-      (t/is (s/get-spec spec))
-      (t/is (s/get-spec alias))
-      (t/is (= (s/form spec) (s/form alias)))))
+                  :gql/Union_ID]]
+      (t/is (s/get-spec spec))))
   (t/testing "specs"
     (t/testing "scalars"
       (test-specs [:gql/ID :gql/String] {:valid ["str"]
@@ -188,11 +174,11 @@
                     :username "user"}
                    {:id "ID"
                     :email true}]})
-      (test-spec :gql.Query/randPosInt-args {:valid [{:noDefault 1
-                                                      :seed 1}]
-                                             :invalid [{}
-                                                       {:seed nil}
-                                                       {:seed true}]}))
+      (test-spec :gql.Query/randPosInt% {:valid [{:noDefault 1
+                                                  :seed 1}]
+                                         :invalid [{}
+                                                   {:seed nil}
+                                                   {:seed true}]}))
     (t/testing "union, union-returning fields, and interface-returning fields"
       (test-specs
         [:gql/Interface_ID

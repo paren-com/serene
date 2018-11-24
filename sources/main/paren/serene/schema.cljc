@@ -1,17 +1,12 @@
-(ns paren.serene.introspection
+(ns paren.serene.schema
   (:require
    [clojure.spec.alpha :as s]
    [clojure.walk :as walk]
-   #?(:clj [clojure.java.io :as io]))
+   #?@(:clj [[clojure.data.json :as json]
+             [clojure.java.io :as io]
+             [org.httpkit.client :as http]]))
   #?(:cljs (:require-macros
-            [paren.serene.introspection :refer [slurp-query]])))
-
-#?(:clj (defmacro ^:private slurp-query []
-          (-> "paren/serene/IntrospectionQuery.graphql"
-            io/resource
-            slurp)))
-
-(def query (slurp-query))
+            [paren.serene.schema :refer [slurp-query]])))
 
 (s/def ::Directive (s/keys
                      :req-un [::__typename
@@ -43,16 +38,41 @@
                                ::name
                                ::type]))
 
-(s/def ::Type (s/keys
-                :req-un [::__typename
-                         ::description
-                         ::enumValues
-                         ::fields
-                         ::inputFields
-                         ::interfaces
-                         ::kind
-                         ::name
-                         ::possibleTypes]))
+(s/def ::Type (s/and
+                (s/keys
+                  :req-un [::__typename
+                           ::description
+                           ::enumValues
+                           ::fields
+                           ::inputFields
+                           ::interfaces
+                           ::kind
+                           ::name
+                           ::possibleTypes])
+                (s/conformer
+                  (fn ensure-typename-field
+                    [{:as m
+                      :keys [fields kind]}]
+                    (if (and
+                          (= kind :OBJECT)
+                          (->> fields
+                            (filter #(= (:name %) :__typename))
+                            first
+                            nil?))
+                      (update m :fields conj {:__typename :__Field
+                                              :args []
+                                              :deprecationReason nil
+                                              :description nil
+                                              :isDeprecated false
+                                              :name :__typename
+                                              :type {:__typename :__Type
+                                                     :kind :NON_NULL
+                                                     :name nil
+                                                     :ofType  {:__typename :__Type
+                                                               :kind :SCALAR
+                                                               :name :String
+                                                               :ofType nil}}})
+                      m)))))
 
 (s/def ::TypeRef (s/and
                    (s/keys
@@ -142,17 +162,23 @@
                              ::directives
                              ::types]))
 
+(s/def ::Schema ::__schema)
+
 (s/def ::data (s/keys
                 :req-un [::__schema]))
 
 (s/def ::errors (s/nilable empty?))
 
-(defn ^:private normalize-response
+(s/def ::response (s/keys
+                    :req-un [::data]
+                    :opt-un [::errors]))
+
+(defn ^:private normalize
   "* keywordizes all keys and some specific values
   * replaces non-serializable collections with serializable collections
   * converts sets and sequential collections into sorted vectors "
-  [response]
-  (->> response
+  [form]
+  (->> form
     walk/keywordize-keys
     (walk/postwalk (fn [x]
                      (cond
@@ -169,8 +195,34 @@
                          (sequential? x)) (->> x (sort-by :name) vec)
                        :else x)))))
 
-(s/def ::response (s/and
-                    (s/conformer normalize-response)
-                    (s/keys
-                      :req-un [::data]
-                      :opt-un [::errors])))
+(s/def ::schema (s/and
+                  (s/conformer normalize)
+                  (s/or
+                    :response ::response
+                    :data ::data
+                    :Schema ::Schema)
+                  (s/conformer
+                    #(case (key %)
+                       :response (-> % val :data :__schema)
+                       :data (-> % val :__schema)
+                       :Schema (-> % val)))))
+
+#?(:clj (defmacro ^:private slurp-query []
+          (-> "paren/serene/IntrospectionQuery.graphql"
+            io/resource
+            slurp)))
+
+(def query (slurp-query))
+
+#?(:clj (defn fetch
+          ([url]
+           (fetch url {}))
+          ([url opts]
+           (-> {:url url
+                :method :post
+                :body (json/write-str {:query query})}
+             (merge opts)
+             http/request
+             deref
+             :body
+             (json/read-str :key-fn keyword)))))
