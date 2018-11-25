@@ -113,7 +113,7 @@
                   ;; interface fields
                   :gql.Interface_EmailOrUsername/email
                   ;; interface field args
-                  :gql.Interface_EmailOrUsername/username%
+                  :gql.Interface_EmailOrUsername.username/&args
 
                   :gql.Interface_EmailOrUsername.username/downcase
                   ;; objects
@@ -126,7 +126,7 @@
                   :gql.Object_EmailOrUsername/__typename
                   :gql.Object_EmailOrUsername/email
                   ;; object field args
-                  :gql.Object_EmailOrUsername/username%
+                  :gql.Object_EmailOrUsername.username/&args
                   :gql.Object_EmailOrUsername.username/downcase
                   ;; unions
                   :gql/Union_ID]]
@@ -174,11 +174,11 @@
                     :username "user"}
                    {:id "ID"
                     :email true}]})
-      (test-spec :gql.Query/randPosInt% {:valid [{:noDefault 1
-                                                  :seed 1}]
-                                         :invalid [{}
-                                                   {:seed nil}
-                                                   {:seed true}]}))
+      (test-spec :gql.Query.randPosInt/&args {:valid [{:noDefault 1
+                                                       :seed 1}]
+                                              :invalid [{}
+                                                        {:seed nil}
+                                                        {:seed true}]}))
     (t/testing "union, union-returning fields, and interface-returning fields"
       (test-specs
         [:gql/Interface_ID

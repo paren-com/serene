@@ -94,7 +94,7 @@ type Mutation { # :gql/Mutation
     username: String!, # :gql.Mutation.createUser/username
     email: Email! # :gql.Mutation.createUser/email
     mood: Mood # :gql.Mutation.createUser/mood
-    # :gql.Mutation/createUser% is an anonymous `s/keys` spec for args map
+    # :gql.Mutation.createUser/&args is an anonymous `s/keys` spec for args map
   ): User! # :gql.Mutation/createUser
 }
 ```

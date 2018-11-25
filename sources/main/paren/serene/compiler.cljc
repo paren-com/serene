@@ -177,8 +177,8 @@
 (defn ^:private args-map-kw
   [kw]
   (keyword
-    (namespace kw)
-    (str (name kw) "%")))
+    (str (namespace kw) "." (name kw))
+    "&args"))
 
 (defmethod -attach-specs :FIELD [schema-path obj]
   (let [obj (attach-child-specs schema-path obj :args)
