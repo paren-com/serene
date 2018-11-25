@@ -17,11 +17,16 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
     - [Rationale](#rationale)
     - [Usage](#usage)
         - [Generated Spec Names](#generated-spec-names)
-        - [`def-specs`](#def-specs)
-            - [`alias`](#alias)
-            - [`extend`](#extend)
-            - [`prefix`](#prefix)
-            - [`postfix-args`](#postfix-args)
+        - [Generating Specs](#generating-specs)
+            - [`paren.serene/def-specs`](#parenserenedef-specs)
+            - [`paren.serene/spit-specs`](#parenserenespit-specs)
+        - [Getting your GraphQL Schema](#getting-your-graphql-schema)
+            - [`paren.serene.schema/fetch`](#parensereneschemafetch)
+            - [`paren.serene.schema/query`](#parensereneschemaquery)
+        - [Compilation Options](#compilation-options)
+            - [`:extend`](#extend)
+            - [`:alias`](#alias)
+            - [`:prefix`](#prefix)
     - [How It Works](#how-it-works)
     - [Status](#status)
     - [License](#license)
@@ -30,28 +35,21 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
 
 ## QuickStart
 
-The heart of Serene, and perhaps the *only* function that you will need to use, is `paren.serene/def-specs`.
-`def-specs` works with any GraphQL API.
-Just query the API with the query defined at `paren.serene/introspection-query` and pass the response to `def-specs`.
-The compilation happens during macro expansion and all arguments to `def-specs` are explicitly `eval`ed.
-Serene can generate specs for your entire GraphQL API in one line of code.
+Serene can generate specs for an entire GraphQL API in one line of code.
 
-Let's say you have a project called "Serenity":
+Let's say you have a project called "Serenity" and a GraphQL API available at `"http://localhost:3000/graphql"`:
 
 ```clojure
 (ns serenity.now
   (:require
    [clojure.spec.alpha :as s]
-   [paren.serene :as serene]))
+   [paren.serene :as serene]
+   [paren.serene.schema :as schema]))
 
-(defn execute-query
-  "Takes a GraphQL query string, executes it against the schema, and returns the results."
-  [query-string]
-  ;; Implementation elided
-  )
+;; Define specs
+(serene/def-specs (schema/fetch "http://localhost:3000/graphql"))
 
-(serene/def-specs (execute-query serene/introspection-query))
-
+;; Use specs
 (s/valid? ::User {:firstName "Frank" :lastName "Costanza"}) ;=> true
 ```
 
@@ -101,60 +99,108 @@ type Mutation { # :gql/Mutation
 }
 ```
 
-### `def-specs`
+### Generating Specs
+
+#### `paren.serene/def-specs`
 
 **Note**: All arguments to `def-specs` are `eval`ed.
 
-`def-specs` optionally takes a transducer as the second argument.
-This transducer will be called in the middle of the compilation and will receive map entries where the keys are qualified keyword spec names and the values are spec forms.
-In this way, you can change any part of the output.
-Serene ships with some default transducer-returning functions for common use cases.
-Since these are just transducers, they can be combined with `comp`.
-
-#### `alias`
-
-`paren.serene/alias` is a function which receives a function (or map) of names to alias(es) and returns a transducer that aliases named specs.
-
-The following would cause both `:api/query` and `:api.query/root` to be defined as aliases of the `:serenity.now/Query` type spec and would cause `:api.query/get-node` to be defined as an alias of the `:serenity.now.Query/node` field spec:
+`def-specs` is a macro that will define specs for a GraphQL schema.
+It takes compilation options as an optional second argument.
+[Compilation options](#compilation-options) are documented below.
 
 ```clojure
-(serene/def-specs (execute-query serene/introspection-query)
-  (serene/alias {:serenity.now/Query #{:api/query :api.query/root}
-                 :serenity.now.Query/node :api.query/get-node}))
- ```
+(serene/def-specs gql-schema options)
+```
 
-#### `extend`
+#### `paren.serene/spit-specs`
 
-`paren.serene/extend` is a function which receives a function (or map) of spec names to spec forms and returns a transducer that will combine them with `s/and`.
+`spit-specs` is like `def-specs`, but outputs `s/def` forms to a file.
+The file path and namespace are the first two arguments to `spit-specs`.
+
+```clojure
+(serene/spit-specs "src/api/specs.cljc" 'api.specs gql-schema options)
+```
+
+### Getting your GraphQL Schema
+
+#### `paren.serene.schema/fetch`
+
+`fetch` takes a GraphQL server endpoint and optional configuration.
+
+```clojure
+(schema/fetch "https://api.github.com/graphql" {:headers {"Authorization" (str "bearer " gh-access-token)}})
+```
+
+#### `paren.serene.schema/query`
+
+`query` is [this GraphQL introspection query string](https://github.com/paren-com/serene/blob/master/resources/main/paren/serene/IntrospectionQuery.graphql).
+
+`fetch` works by asking the HTTP GraphQL server to execute `query`.
+
+You can use `query` directly if your GraphQL API is not accessible via HTTP.
+
+### Compilation Options
+
+#### `:extend`
+
+`:extend` is a function or map of spec names to spec forms. If a spec form is returned, it will be combined with default specs using `s/and`.
+
 For example, if you have a custom `Keyword` scalar you could use the following to add custom scalar validation:
 
 ```clojure
-(serene/def-specs (execute-query serene/introspection-query)
-  (serene/extend {:serenity.now/Keyword `keyword?}))
+(serene/def-specs gql-schema {:extend {:Keyword `keyword?}})
 ```
 
-#### `prefix`
-`paren.serene/prefix` is a function which receives a function (or map) of spec names to spec prefixes and returns a transducer that will rename all specs prefixed with `*ns*`.
+#### `:alias`
+
+`:alias` is a function or map which receives unprefixed spec names and returns aliases for those names.
+
+```clojure
+(serene/def-specs gql-schema {:alias {:Query #{:api/query :api.query/root}
+                                      :Query/node :api.query/get-node}})
+```
+
+This would cause both `:api/query` and `:api.query/root` to be defined as aliases of the `:Query` type spec and would cause `:api.query/get-node` to be defined as an alias of the `:Query/node` field spec.
+
+#### `:prefix`
+
+`:prefix` is a wrapper around `:alias` for the common case of altering default `*ns*` prefixes.
+
 For example, instead of having a long namespace prefix, you might want to prefix your specs with `:gql`:
 
 ```clojure
-(serene/def-specs (execute-query serene/introspection-query)
-  (serene/prefix (constantly :gql)))
+(serene/def-specs gql-schema {:prefix :gql})
   ```
 
 This will produce specs like `:gql/Query`, `:gql.Query/node`, etc.
 
-#### `postfix-args`
-`paren.serene/postfix-args` is a function which receives a function (or map) of field args spec names to postfixes and returns a transducer that will rename all specs postfixed with `%`.
-For background, GraphQL field arguments are individually named but not named as a whole.
-As such, we define an arguments map spec for every field named `(str field-name "%")`.
-`postfix-args` is used to rename `%` to a postfix of your choice.
-For example, if you want arguments specs to end with `-args`, you would do this:
+#### `:gen-object-fields`
+
+`:gen-object-fields` will cause test.check generators for object types to generate all fields, 
+even though all object fields are optional.
+
+This is necessary if you are using test.check to generate data for object, interface, or union types
+because all object fields are optional (clients can query for any combination of fields).
+
+However, generating data for map specs where all keys are optional can be frustrating because you often end up with empty or nearly empty maps.
+It is also not possible to always generate all fields, because objects can be cyclic, so you have to stop after some pre-determined level.
+
+`:gen-object-fields` solves this by always generating all fields up to `n` where `n` is a configurable depth that defaults to `s/*recursion-limit*`.
 
 ```clojure
-(serene/def-specs (execute-query serene/introspection-query)
-  (serene/postfix-args (constantly :-args)))
-  ```
+;; modify all objects to generate `s/*recursion-limit*` levels deep
+(schema/def-specs gql-schema {:gen-object-fields true})
+
+;; modify only `Query` to generate 5 levels deep
+(schema/def-specs gql-schema {:gen-object-fields {:Query 5}})
+```
+
+#### Custom Compilation Options
+
+All compilation options are implemented and documented in [`paren.serene.compiler.transducers`](https://github.com/paren-com/serene/blob/master/sources/main/paren/serene/compiler/transducers.cljc).
+
+Custom compilation options can be added in the same way that default options are provided.
 
 ## How It Works
 
