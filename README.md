@@ -27,6 +27,8 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
             - [`:extend`](#extend)
             - [`:alias`](#alias)
             - [`:prefix`](#prefix)
+            - [`:gen-object-fields`](#gen-object-fields)
+            - [Custom Compilation Options](#custom-compilation-options)
     - [How It Works](#how-it-works)
     - [Status](#status)
     - [License](#license)
@@ -184,7 +186,7 @@ This is necessary if you are using test.check to generate data for object, inter
 because all object fields are optional (clients can query for any combination of fields).
 
 However, generating data for map specs where all keys are optional can be frustrating because you often end up with empty or nearly empty maps.
-It is also not possible to always generate all fields, because objects can be cyclic, so you have to stop after some pre-determined level.
+It is also not possible to always generate all fields, because objects can be cyclic, so you have to stop after some predetermined level.
 
 `:gen-object-fields` solves this by always generating all fields up to `n` where `n` is a configurable depth that defaults to `s/*recursion-limit*`.
 
