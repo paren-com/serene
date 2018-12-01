@@ -192,10 +192,10 @@ It is also not possible to always generate all fields, because objects can be cy
 
 ```clojure
 ;; modify all objects to generate `s/*recursion-limit*` levels deep
-(schema/def-specs gql-schema {:gen-object-fields true})
+(serene/def-specs gql-schema {:gen-object-fields true})
 
 ;; modify only `Query` to generate 5 levels deep
-(schema/def-specs gql-schema {:gen-object-fields {:Query 5}})
+(serene/def-specs gql-schema {:gen-object-fields {:Query 5}})
 ```
 
 #### Custom Compilation Options
