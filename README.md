@@ -9,17 +9,23 @@ Generate [clojure.spec](https://clojure.org/about/spec) with [GraphQL](https://g
 * **Extend GraphQL with your own specs**
 * **Works with Clojure & ClojureScript**
 
+## Clojure/conj 2018 - Robust APIs with clojure.spec & GraphQL 
+
+[![Robust APIs with clojure.spec & GraphQL - Clojure/conj 2018](https://img.youtube.com/vi/mgSSVTDZvkI/0.jpg)](https://www.youtube.com/watch?v=mgSSVTDZvkI)
+
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
 - [Serene](#serene)
+    - [Clojure/conj 2018 - Robust APIs with clojure.spec & GraphQL](#clojureconj-2018---robust-apis-with-clojurespec--graphql)
     - [QuickStart](#quickstart)
     - [Rationale](#rationale)
     - [Usage](#usage)
         - [Generated Spec Names](#generated-spec-names)
-        - [Generating Specs](#generating-specs)
-            - [`paren.serene/def-specs`](#parenserenedef-specs)
-            - [`paren.serene/spit-specs`](#parenserenespit-specs)
+- [Built-in scalars are defined: :gql/Boolean, :gql/Float , :gql/ID , :gql/Int, :gql/String](#built-in-scalars-are-defined-gqlboolean-gqlfloat--gqlid--gqlint-gqlstring)
+    - [-](#-)
+        - [`paren.serene/def-specs`](#parenserenedef-specs)
+        - [`paren.serene/spit-specs`](#parenserenespit-specs)
         - [Getting your GraphQL Schema](#getting-your-graphql-schema)
             - [`paren.serene.schema/fetch`](#parensereneschemafetch)
             - [`paren.serene.schema/query`](#parensereneschemaquery)
