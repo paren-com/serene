@@ -19,7 +19,7 @@
    [paren.serene.compiler :as compiler]
    [paren.serene.schema :as schema]))
 
-(defn ^:private pprint-spit
+(defn pprint-spit
   [f form]
   (io/make-parents f)
   (with-open [w (io/writer f)]
@@ -30,3 +30,11 @@
          :print-level nil
          :print-meta true
          :width 100}))))
+
+(defmacro def-github-specs []
+  `(serene/def-specs
+     (schema/fetch
+       "https://api.github.com/graphql"
+       {:headers {"Authorization" (str "bearer " (System/getenv "GITHUB_ACCESS_TOKEN"))}})
+     {:gen-object-fields 3
+      :prefix :gh}))

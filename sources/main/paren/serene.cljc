@@ -15,14 +15,23 @@
   "Takes a GraphQL schema and an optional transducer or options map/seq.
   Options/transducers are defined in `paren.serene.compiler.transducers`.
   The transducer will receive spec maps, as defined in `paren.serene.compiler`.
-  Returns a topologically sorted vector of `s/def` forms.
   All arguments to `def-specs` are explicitly `eval`ed."
   ([schema]
    `(def-specs ~schema nil))
   ([schema xform]
    (let [resp (eval schema)
-         xf (eval xform)]
-     (compiler/compile resp xf))))
+         xf (eval xform)
+         specs (compiler/compile resp xf)
+         ;; Fixes `Method code too large!` bug
+         fn-wrap (fn [form]
+                   `((fn []
+                       ~form)))]
+     (->> specs
+       (map fn-wrap)
+       (partition-all 1000)
+       (mapv (comp fn-wrap vec))
+       (list 'apply 'concat)
+       (list 'vec)))))
 
 #?(:clj (def ^:private generated-file-header
           (->> ["; Serene"
