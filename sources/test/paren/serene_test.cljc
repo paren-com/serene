@@ -26,8 +26,8 @@
                                            (->> scalars
                                              (map (fn [[k v]]
                                                     [k (assoc v
-                                                         :parse (s/conformer any?)
-                                                         :serialize (s/conformer any?))]))
+                                                         :parse identity
+                                                         :serialize identity)]))
                                              (into {}))))
                 schema (lacinia.schema/compile edn)
                 resp (lacinia/execute schema schema/query {} {})]
