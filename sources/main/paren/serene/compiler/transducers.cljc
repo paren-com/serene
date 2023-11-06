@@ -49,7 +49,7 @@
          (if-let [ext (and
                         (not alias?)
                         (extend-fn schema-key))]
-           (assoc spec ::compiler/form `(s/and ~form ~ext))
+           (assoc spec ::compiler/form `(s/and ~ext ~form))
            spec))))
 
 ;; Takes a function (or map) that will receive an object type spec name and
